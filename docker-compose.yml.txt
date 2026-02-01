@@ -1,0 +1,98 @@
+version: "3.9"
+
+# ======================================================
+# GOVERNMENT HOSPITAL AI HEALTHCARE SYSTEM
+# Docker Compose Configuration
+# ======================================================
+
+services:
+
+  # --------------------------------------------------
+  # FASTAPI BACKEND (AI + DATABASE API)
+  # --------------------------------------------------
+  api:
+    container_name: healthcare_api
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: >
+      uvicorn api.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+    volumes:
+      - .:/app
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./database:/app/database
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    restart: always
+
+  # --------------------------------------------------
+  # STREAMLIT WEB APP (DOCTOR / ADMIN UI)
+  # --------------------------------------------------
+  web:
+    container_name: healthcare_streamlit
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    command: >
+      streamlit run webapp/app.py
+      --server.port=8501
+      --server.address=0.0.0.0
+    volumes:
+      - .:/app
+      - ./models:/app/models
+      - ./data:/app/data
+    env_file:
+      - .env
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    restart: always
+
+  # --------------------------------------------------
+  # DATABASE SERVICE
+  # Default: SQLite (file-based)
+  # Optional: PostgreSQL (comment SQLite usage in code)
+  # --------------------------------------------------
+  db:
+    container_name: healthcare_db
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    restart: always
+
+  # --------------------------------------------------
+  # OPTIONAL: ADMIN DB TOOL (PGADMIN)
+  # --------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: healthcare_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@govhospital.in
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    restart: always
+
+# ======================================================
+# VOLUMES
+# ======================================================
+volumes:
+  postgres_data:
